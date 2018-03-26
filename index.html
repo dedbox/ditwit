@@ -1,0 +1,575 @@
+<!doctype html>
+<html>
+  <head>
+    <title> Eric Griffis ::  CS239 </title>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" type="text/css" href="main.css">
+    <link rel="stylesheet" type="text/css" href="ditmon.css">
+    <script src="js/jquery-2.1.1.min.js"></script>
+    <script src="js/d3.min.js"></script>
+  </head>
+
+  <body>
+    <script src="ditmon-records.js"></script>
+    <script src="ditmonplay.js"></script>
+    <center>
+      <article><header><center>
+
+        <h1 class="title"> Design and construction of scalable ad-hoc
+          software overlay networks </h1>
+
+        <address class="author"><a rel="author">
+
+          Eric Griffis
+
+        </a></address><br>
+        <time pubdate datetime="2014-06-12" title="June 12, 2014">
+
+          June 12, 2014
+
+        </time><br><br></center></header>
+
+<!-- ------------------------------------------------------------- -->
+
+<section><h2> 1. Introduction </h2>
+
+  <p>The subject for this paper is <em>scale</em>.
+    In particular, we focus on the scalability of names. It has been
+    proposed, or perhaps implied, that names may not scale for at
+    least two reasons. First, names are a purely syntactic notion
+    which lack any inherent semantic quality; and second, achieving
+    global consensus of names is prohibitively expensive at large
+    scales. This section outlines the thought process that led me from
+    these concerns to a multi-faceted exploration of ad-hoc
+    distributed software system design. Sections 2 and 3 present the
+    various discoveries I made along the way. Section 4 suggests ideas
+    for future exploration, and section 5 concludes.</p>
+
+  <h3> 1.1 To name is human </h3>
+
+  <p>Across the spectrum of human activity, names are ubiquitous. We
+    compulsively attach names to things in our environment so we may
+    begin to understand them. As our understanding of a thing grows,
+    the name we give to the thing absorbs new meaning and thus becomes
+    more concise. Similarly, many forms of computer programming are
+    merely abstraction-naming games, where the goal is to express
+    computations with desirable properties like elegance or
+    efficiency. Clearly, the syntactic nature of naming is no barrier
+    to our ability to discover and assign meaning to things in the
+    real world.</p>
+
+  <p>The scalability of global consensus is, however, undeniably poor,
+    particularly if we expect consensus to arise in accordance with
+    lofty human ideals like fairness and accountability. When only one
+    agent has authority to assign names, global consensus in small
+    networks emerges almost trivially. As the number of agents with
+    such authority increases, so does the amount of communications
+    overhead required to achieve consensus. Inversely, communications
+    overhead decreases as trust in the controlling agents increases.
+    Hence, large name-based networks tend to degenerate in the face of
+    politics and economic factors.</p>
+
+  <p>I found this apparent connection to the soft sciences compelling
+    and wanted to determine how far the analogy would stretch.
+    According to Katouzian&nbsp;[Kat90], philosophy, science, and
+    society are indispensable features of human life. To paraphrase,
+    philosophy provides direction to scientific and social endeavors,
+    society gives purpose to scientific and philosophical pursuits,
+    and science informs the methods of the other two aspects. At the
+    intersections of these aspects, we have economics, politics, and
+    engineering. Economists quantify social activity like resource
+    allocation and exchange; politicians prescribe order for such
+    activity according to moral, ethical, and legal priorities; and
+    engineers design, implement, and analyze the fruits of the
+    decision-making process.</p>
+
+  <figure><img src="fig/triangle.png" width="40%"><figcaption>
+
+    Figure 1. Katouzian's indispensable features of human life.
+
+  </figcaption></figure>
+
+  <p>Consider the typical roles of employees at a large software
+    company. The executives identify a problem space and a related
+    client base, then secure funding to hire scientists to search for
+    novel solutions. Once found, the executives bring in engineers to
+    tailor the results to specific occurrences of the problem. This
+    example covers the six aspects of the triangle. Note that each
+    aspect serves a vital role in the success of the company,
+    including the client base and funding source.</p>
+
+  <p>As scientists and engineers, we need to do extra work to
+    understand the other four perspectives, which is unfortunate
+    because this understanding can bring valuable intuition to bear
+    when designing multi-agent systems. This claim is not
+    extraordinary. Case in point, the <em>dining philosophers
+    problem</em>&nbsp;[Hoa85], as told by Hoare, involves a
+    philanthropist (programmer) who hires a College of philosophers
+    (processes) that eat (access shared resources) unpredictably. To
+    prevent deadlock, the philanthropist appoints a footman
+    (semaphore) or a group of lackeys (mutexes). Hoare explains
+    livelock as a footman's irrational dislike of certain
+    philosophers, and provides precisely-defined laws (system design)
+    that govern overall behavior.</p>
+
+  <p>We can also apply basic knowledge of political structures to get
+    a grasp on our issues with scalable naming. For instance, a system
+    with only one authoritative name-assigning agent is like a
+    dictatorship&mdash;changes may be implemented swiftly, but each
+    subject agent must remain in sync with the dictator or risk losing
+    access to basic services. If the dictator is a tyrant, subjects
+    will flee. If demand for basic services overwhelms supply,
+    subjects will starve. To avoid these problems, the dictator must
+    be responsive to local demand and be willing to delegate
+    internally. If the subjects of one dictator wish to interact with
+    subjects of another, both dictators must also be capable of
+    negotiation.</p>
+
+  <p>If the analogy is sound, then we should be able to construct
+    arbitrarily scalable naming systems by establishing regions in
+    which distinct dictators enforce <em>local</em> consensus of names
+    and then <em>negotiate</em> inter-region translation conventions.
+    Note that if subjects are capable of operating under several
+    dictators, i.e., holding dual citizenship, then these local
+    regions may overlap. Many interesting parallels exist between
+    distributed systems and political structures&mdash;for example,
+    Paxos&nbsp;[Lam01] resembles the American congress.</p>
+
+  <h4> First idea: decentralized name negotiation </h4>
+
+  <p>My original plan was to explore the conjectured scalable naming
+    system directly. I decided to simulate a billion-agent network of
+    semi-autonomous regions of authority. To stimulate region
+    formation and evolution, I wanted to simulate irrational
+    ideological bias&nbsp;[Fin81] regulated by a quantifiable trust
+    metric&nbsp;[Gol09], likely modeled as probabilities. After some
+    preliminary calculations and a poor reception,
+    I shelved the idea in favor of higher-level
+    pursuits better suited to my interests.</p>
+
+  <h4> Second idea: scale-free networks </h4>
+
+  <p>While reviewing the literature on massive simulations, I
+    discovered that many large, naturally-occurring networks exhibit
+    fractal-like qualities. Popular examples include protein
+    interaction networks and social networks, which are said to be
+    <em>scale free</em>&nbsp[Bar03]. Scale-free networks can be
+    characterized by three properties: preferential attachment, small
+    network diameter, and resilience to random failure. Preferential
+    attachment is a tendency for older nodes to become better
+    connected than newer ones. For instance, proteins that evolved
+    earlier tend to interact positively with other proteins more
+    frequently than newer ones because of sustained evolutionary
+    pressure. Similarly, well-connected members of a social network
+    get more visibility than new members and so are more likely to
+    make new connections. Finally, hubs emerge naturally in the
+    presence of preferential attachment. Hubs are rare but
+    well-connected, so the diameter of the network remains low and the
+    probability that a hub dies randomly is very small for large
+    networks. Preferential attachment also leads naturally to multiple
+    paths between nodes, which further enhances resilience to random
+    failure.</p>
+
+  <p>Many scale-free network services, such as Twitter, Facebook, and
+    GMail, expose a traditional star network interface. The Twitter
+    retweet network, for example, is a scale-free network&nbsp;[Tin12]
+    simulated within Twitter's internal network and exposed through
+    the Web. Why does a less efficient model prevail over a direct
+    scale-free implementation? What prevents widespread adoption of
+    truly scale-free networks? The Twitter core is essentially a
+    public message routing service&mdash;an extremely basic
+    non-trivial network&mdash;so I tried to build a decentralized
+    Twitter-like service to try to answer these question. I discovered
+    that designing and debugging ad-hoc distributed systems is highly
+    non-trivial and requires specialized tools and methods.</p>
+
+  <h4> Complexity is a <em>design</em> problem </h4>
+
+  <p>Reasoning about concurrent programs is, of course, harder than
+     reasoning about sequential programs, even when the concurrent
+     program is composed of sequentially-programmed agents. At first,
+     the code rapidly became littered with communications
+     boilerplate&mdash;managing connections and transmitting
+     messages&mdash;which complicated exploration of higher-level
+     issues like message routing and management of inter-agent
+     relationships. I needed an abstraction to manage communications
+     and message delivery so that I could focus on the system design.</p>
+
+  <p>The Actor model seemed like a possible fit for my needs, so I
+    tried writing my agents in Erlang. Erlang offers primitive support
+    for fast, asynchronous communication, but its distribution model
+    is not suited for ad-hoc distribution. In Erlang, the behavior of
+    a spawned process is set by the process that initiates the spawn.
+    In other words, all nodes participating in a native Erlang cluster
+    trust each other implicitly. This arrangement is exactly backwards
+    from what I want. Imagine if a Web server merely listened for
+    connections on TCP port 80 and then executed whatever data came in
+    like a native binary. This clearly won't do. I was able to code a
+    proper abstraction to pass tuples over TCP connections, but I had
+    to manage a character buffer and the resulting code looked more
+    like C than Erlang. In the end, I chose Racket, which also offers
+    a complete suite of message management tools based on the standard
+    Scheme <code>read</code>, <code>write</code>, and
+    <code>eval</code> operations. Lesson learned: concurrent message
+    passing is not exactly the same as distributed message
+    passing.</p>
+
+  <figure>
+    <pre><code>client (Msg) ->
+    {ok, Sock} = gen_tcp:connect("localhost", 4545, [binary, {packet, 0}]),
+    ok = gen_tcp:send(Sock, term_to_binary(Msg)),
+    ok = gen_tcp:close(Sock).
+
+server() ->
+    {ok, LSock} = gen_tcp:listen(4545, [binary, {packet, 0}, {active, false}]),
+    {ok, Sock} = gen_tcp:accept(LSock),
+    {ok, Bin} = do_recv(Sock, []),
+    ok = gen_tcp:close(Sock),
+    io:format("~p~n", [binary_to_term(Bin)]).
+
+do_recv(Sock, Bs) ->
+    case gen_tcp:recv(Sock, 0) of
+        {ok, B} ->
+            do_recv(Sock, [Bs, B]);
+        {error, closed} ->
+            {ok, list_to_binary(Bs)}
+    end.</code></pre>
+
+    <figcaption>
+
+      Figure 2. TCP messaging in Erlang.
+
+  </figcaption></figure>
+
+  <figure>
+    <pre><code>(define (client msg)
+  (define-values (in out) (tcp-connect "localhost" 4545))
+  (fprintf out "~s~n" msg)
+  (flush-output out)
+  (close-input-port in)
+  (close-output-port out))
+
+(define (server)
+  (define listener (tcp-listen 4545 5 #t))
+  (define-values (in out) (tcp-accept listener))
+  (displayln (read in))
+  (close-input-port in)
+  (close-output-port out))</code></pre>
+
+    <figcaption>
+
+      Figure 3. TCP messaging in Racket.
+
+  </figcaption></figure>
+
+  <h4> Complexity is a <em>construction</em> problem </h4>
+
+  <p>Though communication overhead is annoying, we can usually
+    mitigate its negative effects on code clarity with whitespace and
+    encapsulation. The bigger problem is in determining if the system
+    will operate correctly. Formal methods exist for verifying the
+    correctness of a concurrent system design, but we can not verify a
+    design until it has been specified. Hence, we often wish to
+    explore the possibilities as we formulate a design. Dynamic
+    visualization is a powerful tool for gauging the correctness of a
+    design in progress.</p>
+
+  <p>Some visualization tools exist, but none were very good for
+    evaluating dynamic system designs. Gephi, for example, is geared
+    for analyzing properties of very large graph structures like
+    degree distribution. yEd, another popular tool,is well-suited for
+    smaller structures but provides only static visualizations. To get
+    fast, real-time, dynamic visualization, I ended up writing my own
+    visualization tool, using a combination of JavaScript
+    technologies.</p>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<section><h2> 2. DiTMon: dynamic visualization </h2>
+
+  <p>The visualization tool consists of three components: front,
+    middle and back. The front end is an HTML page that loads the
+    D3.js and Socket.io libraries; it manages a set of nodes and a set
+    of links. The middle component is a Node.js Web server that
+    translates HTTP GET URIs into Socket.io events and dispatches them
+    to the front end. The back end is a Racket library that translates
+    procedure calls into HTTP GET URIs. The Racket library also
+    includes configurable post-event delays to enhance the visibility
+    of select events. All three components are included in the
+    submission archive. To use the visualization library, first embed
+    some visualization calls in the target implementation, then start
+    the Node.js Web server and point a browser at it. As the target
+    executes, its calls into the library are drawn in real time.</p>
+
+  <p>Each node on the visualization surface corresponds to an agent
+    process. A directed edge between two nodes represents an
+    established publish-subscribe relationship between two agents.</p>
+
+  <figure>
+    <figure class="subfigure"><img src="fig/node.png"><figcaption>
+
+      (a) node
+
+    </figcaption></figure>
+    <figure class="subfigure"><img src="fig/subscribe.png"><figcaption>
+
+      (b) link
+
+    </figcaption></figure><figcaption>
+
+      Figure 4. Nodes and links.
+
+    </figcaption>
+  </figure>
+
+  <p>A thick colored arrow denotes an inter-agent message exchange. I
+    currently support three kinds of messages. A <em>publish</em> message
+    is green, an <em>unsubscribe</em> message is yellow, and any other
+    message is gray with a dotted tail.</p>
+
+  <figure>
+    <figure class="subfigure"><img src="fig/comm.png"><figcaption>
+
+      (a) generic
+
+    </figcaption></figure>
+    <figure class="subfigure"><img src="fig/publish.png"><figcaption>
+
+      (b) publish
+
+    </figcaption></figure>
+    <figure class="subfigure"><img src="fig/unsubscribe.png"><figcaption>
+
+      (c) unsubscribe
+
+    </figcaption></figure><figcaption>
+
+      Figure 5. Three kinds of messages.
+
+    </figcaption>
+  </figure>
+
+  <p>The limit on nodes per experiment maxed out around 150 because of
+    high latency, likely due to browser-based rendering of SVG and the
+    relatively high communications overhead of driving the
+    visualization through HTTP and WebSockets. I tried to replace the
+    HTTP server with direct Unix socket communications, but this
+    quickly degenerated into a distracting game of explicit buffer
+    management that resembled the earlier problem with Erlang.
+    Finally, though Javascript is asynchronous, it is not truly
+    multi-threaded.</p>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<section><h2> 3. Experiments </h2>
+
+  <p>I ended with nine complete experiments, but did not achieve a
+    truly scale-free design. Each experiment proceed as follows:</p>
+
+  <ol>
+    <li>Start publisher(s).</li>
+    <li>Start subscribers.</li>
+    <li>Subscribe all subscribers to the publisher(s).</li>
+    <li>Publish a message.</li>
+    <li>Unsubscribe some subscribers.</li>
+    <li>Publish another message.</li>
+    <li>shutdown publisher(s).</li>
+  </ol>
+
+  <p>Each agent contains a message inbox, a set of publishers, and a set
+    of subscribers.</p>
+
+  <h3> 3.1. Case study: star networks </h3>
+
+  <p>The star network is the classic client-server architecture. When
+    the publisher shuts down, it first unsubscribes any existing
+    subscribers.</p>
+
+  <h4> 3.1.1. Sequential </h4>
+
+  <svg id="starSync" width="100%" height="7in"></svg><br>
+  <button id="starSyncBtn" onclick="ditmonplay ('starSync')">Play</button>
+
+  <h4> 3.1.2. Concurrent </h4>
+
+  <p>An interesting discovery was that Racket uses green threads,
+    which causes the apparent layering effect in this version.</p>
+
+  <svg id="starAsync" width="100%" height="7in"></svg><br>
+  <button id="starAsyncBtn" onclick="ditmonplay ('starAsync')">Play</button>
+
+  <h5> Multi-star </h5>
+
+  <p>This experiment demonstrates a three-publisher network. For
+    visual clarity, no publisher in this example subscribes to
+    another, although a realistic deployment would likely include such
+    dual-role agents.</p>
+
+  <svg id="starMulti" width="100%" height="7in"></svg><br>
+  <button id="starMultiBtn" onclick="ditmonplay ('starMulti')">Play</button>
+
+  <h3> 3.2. Case study: tree networks </h3>
+
+  <p>To promote tree-like growth, each agent contains at most 3 direct
+    subscribers. Further subscription requests are deferred to one of
+    the existing subscribers for relay, which gives an appearance of
+    agents "walking" along the deferral path. When a node
+    unsubscribes, it must notify all direct children so that they can
+    request another publisher relay. To expedite the shutdown process,
+    I send an <em>abort</em> message instead of a full unsubscribe.</p>
+
+  <h4> 3.2.1. Sequential </h4>
+
+  <svg id="treeSync" width="100%" height="7in"></svg><br>
+  <button id="treeSyncBtn" onclick="ditmonplay ('treeSync')">Play</button>
+
+  <h4> 3.2.2. Concurrent </h4>
+
+  <svg id="treeAsync" width="100%" height="7in"></svg><br>
+  <button id="treeAsyncBtn" onclick="ditmonplay ('treeAsync')">Play</button>
+
+  <h5> Multi-tree </h5>
+
+  <svg id="treeMulti" width="100%" height="7in"></svg><br>
+  <button id="treeMultiBtn" onclick="ditmonplay ('treeMulti')">Play</button>
+
+  <h3> 3.3. Case study: wheel networks </h3>
+
+  <p>The wheel network adds redundancy to the star network by making
+    each subscriber a relay for the next. For large networks, this
+    gives the appearance of a spider stitching together its web.</p>
+
+  <h4> 3.3.1. Sequential </h4>
+
+  <svg id="wheelSync" width="100%" height="7in"></svg><br>
+  <button id="wheelSyncBtn" onclick="ditmonplay ('wheelSync')">Play</button>
+
+  <h4> 3.3.2. Asynchronous </h4>
+
+  <p>It turns out that maintaining consistent references to the "next"
+    and "previous" subscriber is not straight-forward in a concurrent
+    setting, so I ended up guarding subscribe/unsubscribe events in
+    the publisher's thread with a semaphore.</p>
+
+  <svg id="wheelAsync" width="100%" height="7in"></svg><br>
+  <button id="wheelAsyncBtn" onclick="ditmonplay ('wheelAsync')">Play</button>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<section><h2> 4. Future work </h2>
+
+  <p>Now that I understand better the implications of Racket's green
+    threads, I would like to port the experiments to a platform with
+    better concurrency model, such as Erlang. This will also give me
+    an opportunity to gain performance by figuring out proper buffer
+    management. Also, I suspect there are more tools and literature on
+    the subject of dynamic visualization. Finding these resources
+    would accelerate the development process. </p>
+
+  <p>I would also like to continue pursuing a scale-free model. Now
+    that I have supporting tools in place, the hard part is figuring
+    out how to simulate preferential attachment. A direct approach is
+    to choose the set of publisher relays for each subscriber agent
+    probabilisticly, where the probability that a given node becomes a
+    publisher relay is proportional to some function of the number of
+    existing subscriber nodes. Evaluating failures will also require
+    more thought, though a probabilistic approach seems fairly
+    direct.</p>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<section><h2> 5. Conclusion </h2>
+
+  <p>Throughout this work, I've made the assumption that ad-hoc
+    distributed systems are interesting and important. With that in
+    mind, I discovered that designing ad-hoc distributed systems is
+    difficult, and so is constructing them without a formal model.
+    Furthermore, visualization is not trivial&mdash;I ended up
+    spending more time on it than I had planned for and never got
+    around to designing a truly scale-free network. I did, however,
+    acquire a deeper understanding of some of the difficulties.</p>
+
+  <p>Most importantly, I learned that there is value in
+    general-purpose tools to assist in the design and construction of
+    ad-hoc overlay networks. Though related tools and services exist,
+    trying to fit them to this task can be difficult and
+    distracting.</p>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<section class="references"><h2> References </h2>
+
+  <table style="padding-bottom: 0.5in">
+
+    <tr>
+      <td> [Bar03] </td>
+      <td>Barabási, AL, and E Bonabeau. “Scale-Free Networks.”
+        <i>Scientific American</i> 288, no. 5 (2003): 60.</td>
+    </tr>
+
+    <tr>
+      <td> [Fin81] </td>
+      <td>Fine, Ben. <i>Economic Theory and Ideology</i>. Holmes &amp;
+        Meier Publishers, 1981.</td>
+    </tr>
+ 
+    <tr>
+      <td> [Gol09] </td>
+      <td>Golbeck, Jennifer, ed. <i>Computing with Social Trust</i>.
+        Human-Computer Interaction Series. London: Springer London,
+        2009. http://link.springer.com/10.1007/978-1-84800-356-9.</td>
+    </tr>
+
+    <tr>
+      <td> [Hoa85] </td>
+      <td>Hoare, C.A.R. <i>Communicating Sequential Processes</i>.
+        Modular Exploration of Technology Series. Prentice Hall
+        International, Incorporated, 1985.
+        http://books.google.com/books?id=GIJQAAAAMAAJ.</td>
+    </tr>
+
+    <tr>
+      <td> [Kat90] </td>
+      <td>Katouzian, Homa. <i>Ideology and Method in Economics</i>.
+        Macmillan London, 1980.</td>
+    </tr>
+
+    <tr>
+      <td> [Lam01] </td>
+      <td>Lamport, Leslie. “Paxos Made Simple.” <i>ACM Sigact News</i>
+        32, no. 4 (2001): 18–25.</td>
+    </tr>
+
+    <tr>
+      <td> [Tin12] </td>
+      <td>Tinati, Ramine, Les Carr, Wendy Hall, and Johnny Bentwood.
+        “Scale Free: Twitter’s Retweet Network Structure,” 2012.
+        http://eprints.soton.ac.uk/344807/.</td>
+    </tr>
+
+  </table>
+
+</section>
+
+<!-- ------------------------------------------------------------- -->
+
+<footer>
+  <center>
+    Eric Griffis &nbsp;|&nbsp; UCLA CS 239 &nbsp;|&nbsp; Spring 2014
+  </center>
+</footer>
+
+      </article>
+    </center>
+  </body>
+</html>

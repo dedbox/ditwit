@@ -1,0 +1,74 @@
+svg {
+    padding: 0;
+    margin: 0;
+    border: 1px dashed #aaa;
+}
+
+.link {
+    fill: none;
+    stroke: cyan;
+    stroke-width: 1.5px;
+}
+
+.link.subscribe {
+    stroke: #123652;
+    stroke-width: 2px;
+}
+
+.link.unsubscribe {
+    stroke: #a8aa39;
+    stroke-width: 4px;
+}
+
+.link.publish {
+    stroke: #4b9130;
+    stroke-width: 4px;
+}
+
+.link.comm {
+    stroke: gray;
+    stroke-dasharray: 0,2 1;
+    stroke-width: 4px;
+}
+
+#subscribe {
+    fill: #123652;
+}
+
+#unsubscribe {
+    fill: #a8aa39;
+}
+
+#publish {
+    stroke: #4b9130;
+    fill: #73b55b;
+}
+
+#comm {
+    fill: gray;
+}
+
+.node {
+    fill: cyan;
+    stroke: black;
+    stroke-width: 4px;
+}
+
+.node.comm {
+    fill: gray;
+}
+
+.node.subscribe {
+    stroke: #123652;
+    fill: white;
+}
+
+.node.unsubscribe {
+    stroke: #a8aa39;
+    fill: #d3d46a;
+}
+
+.node.publish {
+    fill: #73b55b;
+    stroke: #4b9130;
+}
